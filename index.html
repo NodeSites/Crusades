@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>الحروب الصليبية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@300;400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --void:#0d0a07; --void2:#161009; --parchment:#e9ddc0; --gold:#c9a227;
+  --gold-dim:#8a721f; --blood:#7c2230; --ink:#efe6cf;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ } }
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+body{
+  background:radial-gradient(ellipse at 50% 30%, #1c130a 0%, var(--void) 70%);
+  color:var(--ink); font-family:'Tajawal',sans-serif; overflow:hidden;
+  height:100%; width:100%; position:fixed; inset:0;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  touch-action:none;
+}
+.stage{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column;}
+
+/* ---------- START SCREEN ---------- */
+#start{ z-index:10; transition:opacity .6s ease; gap:2.2rem; }
+#icon-wrap{ width:120px; height:120px; display:flex; align-items:center; justify-content:center; position:relative; }
+#icon-wrap::before, #icon-wrap::after{
+  content:''; position:absolute; width:80px; height:80px; border:2px solid var(--gold);
+  border-radius:50%; opacity:0; pointer-events:none;
+}
+#icon-wrap.animating::before{ animation:ringPing 1.7s ease-out .05s infinite; }
+#icon-wrap.animating::after{ animation:ringPing 1.7s ease-out .85s infinite; }
+@keyframes ringPing{ 0%{ transform:scale(.55); opacity:.75; } 100%{ transform:scale(2); opacity:0; } }
+#icon{ width:80px; height:80px; overflow:visible; }
+.node-rect{
+  fill-opacity:0; stroke-width:1.2; stroke-dasharray:32; stroke-dashoffset:32;
+  transition:stroke-dashoffset .4s ease, fill-opacity .3s ease;
+}
+#icon-wrap.animating .node-rect.g1{ stroke-dashoffset:0; fill-opacity:1; transition-delay:0s, .35s; }
+#icon-wrap.animating .node-rect.w1{ stroke-dashoffset:0; fill-opacity:1; transition-delay:.35s, .65s; }
+#icon-wrap.animating .node-rect.w2{ stroke-dashoffset:0; fill-opacity:1; transition-delay:.45s, .75s; }
+#icon-wrap.animating .node-rect.g2{ stroke-dashoffset:0; fill-opacity:1; transition-delay:.7s, 1.05s; }
+#icon-wrap.animating #icon{ animation:nodeGlow 1.3s ease-in-out 1.15s infinite; }
+@keyframes nodeGlow{
+  0%,100%{ filter:drop-shadow(0 0 4px #7fff5a); }
+  50%{ filter:drop-shadow(0 0 16px #7fff5a); }
+}
+#start-btn{
+  font-family:'Amiri',serif; font-size:1.6rem; color:var(--void);
+  background:linear-gradient(180deg,#e2c467,var(--gold-dim));
+  border:1px solid #3a2f12; border-radius:4px; padding:.7rem 3.2rem;
+  cursor:pointer; letter-spacing:.05em;
+  box-shadow:0 2px 0 #4a3a15, 0 10px 24px rgba(0,0,0,.5);
+}
+#start-btn:active{ transform:translateY(2px); box-shadow:0 0 0 #4a3a15; }
+#start-btn:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
+#loadbar-track{ width:220px; height:4px; background:#2b2013; border-radius:2px; overflow:hidden; opacity:0; transition:opacity .3s; }
+#loadbar-track.show{ opacity:1; }
+#loadbar-fill{ height:100%; width:0%; background:var(--gold); transition:width 2.1s cubic-bezier(.4,0,.2,1); }
+
+/* ---------- BLACK SCREEN TRANSITION ---------- */
+#black-screen{
+  position:fixed; inset:0; z-index:9; background-color:#000;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity .7s ease;
+}
+#black-screen.show{ opacity:1; pointer-events:auto; }
+#red-title{
+  font-family:'Amiri',serif; font-weight:700; font-size:4rem; color:#cc0000;
+  opacity:0; transition:opacity .5s ease; text-align:center;
+}
+#red-title.show{ opacity:1; }
+
+/* ---------- CHAPTERS ---------- */
+#deck{ position:absolute; inset:0; perspective:1400px; z-index:5; opacity:0; pointer-events:none; }
+#deck.show{ opacity:1; pointer-events:auto; transition:opacity .5s ease; }
+.page{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:2rem 1.5rem; text-align:center; transform-style:preserve-3d; backface-visibility:hidden;
+  transition:transform 2s cubic-bezier(.6,0,.25,1), opacity 1.6s ease;
+  background:radial-gradient(ellipse at 50% 0%, rgba(201,162,39,.05), transparent 60%);
+}
+.page::before{
+  content:''; position:absolute; inset:8% 10%; border:1px solid rgba(201,162,39,.12);
+  pointer-events:none;
+}
+.page .eyebrow{ font-size:.85rem; color:var(--gold); margin-bottom:.6rem; font-weight:600; }
+.page h2{ font-family:'Amiri',serif; font-size:2.3rem; color:var(--parchment); margin-bottom:1.2rem; }
+.page p{ max-width:560px; line-height:2.1; font-size:1.15rem; font-weight:300; color:#d9cdae; }
+.page-box{
+  background:rgba(18,13,7,.6); border:1px solid rgba(201,162,39,.35); border-radius:10px;
+  padding:2rem 1.8rem; max-width:640px; width:100%; display:flex; flex-direction:column; align-items:center;
+  box-shadow:0 20px 55px rgba(0,0,0,.45); backdrop-filter:blur(2px);
+}
+.page.active{ transform:translateX(0) translateY(0) translateZ(0) rotate(0deg) scale(1); opacity:1; z-index:2; filter:none; }
+.page.next{
+  transform:translateX(135%) translateY(-6%) translateZ(-420px) rotateY(42deg) rotate(9deg) scale(.85);
+  opacity:0; z-index:1; filter:blur(1px);
+}
+.page.prev{
+  transform:translateX(-135%) translateY(7%) translateZ(-420px) rotateY(-42deg) rotate(-8deg) scale(.85);
+  opacity:0; z-index:1; filter:blur(1px);
+}
+.dots{ position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 1.4rem); left:50%; transform:translateX(-50%);
+  display:flex; gap:.5rem; z-index:6; }
+.dot{ width:7px; height:7px; border-radius:50%; background:#4a3f2a; transition:background .3s; }
+.dot.active{ background:var(--gold); }
+.hint{ position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 2.6rem); left:50%; transform:translateX(-50%);
+  font-size:.8rem; color:#7a6f52; z-index:6; }
+.arrow-btn{ position:absolute; top:50%; transform:translateY(-50%); z-index:6; background:none; border:none;
+  color:var(--gold-dim); font-size:2rem; cursor:pointer; padding:.5rem 1rem; }
+.arrow-btn:hover{ color:var(--gold); }
+.arrow-btn:focus-visible{ outline:2px solid var(--gold); }
+#prev-btn{ right:.2rem; } #next-btn{ left:.2rem; }
+
+/* ---------- STATS ---------- */
+.stats-grid{ display:grid; grid-template-columns:repeat(3,minmax(90px,1fr)); gap:1.6rem 1.2rem; max-width:620px; }
+.stat-block{ display:flex; flex-direction:column; align-items:center; }
+.stat-num{ font-family:'Amiri',serif; font-weight:700; font-size:2.6rem; color:var(--gold); line-height:1; }
+.stat-label{ font-size:.85rem; color:#c9bd9d; margin-top:.4rem; max-width:120px; }
+
+/* ---------- QUIZ ---------- */
+.quiz-wrap{ width:100%; max-width:560px; max-height:78vh; overflow-y:auto; padding:0 .4rem; }
+.quiz-q{ margin-bottom:1.5rem; text-align:right; }
+.quiz-q p{ font-size:1.05rem; color:var(--parchment); margin-bottom:.6rem; max-width:none; line-height:1.7; }
+.quiz-opts{ display:flex; flex-direction:column; gap:.5rem; }
+.quiz-opt{
+  font-family:'Tajawal',sans-serif; font-size:.95rem; text-align:right; color:var(--ink);
+  background:rgba(233,221,192,.05); border:1px solid rgba(201,162,39,.3); border-radius:4px;
+  padding:.6rem .9rem; cursor:pointer; transition:background .2s, border-color .2s;
+}
+.quiz-opt:hover:not(:disabled){ border-color:var(--gold); }
+.quiz-opt.correct{ background:rgba(90,140,70,.25); border-color:#7fae5a; }
+.quiz-opt.wrong{ background:rgba(124,34,48,.3); border-color:var(--blood); }
+.quiz-opt:disabled{ cursor:default; opacity:.85; }
+#quiz-score{ text-align:center; color:var(--gold); font-weight:600; margin-top:.4rem; }
+
+/* ---------- MAP ---------- */
+#map-toggle{
+  position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 1rem); right:1rem; z-index:6;
+  width:42px; height:42px; border-radius:50%; border:1px solid var(--gold-dim);
+  background:rgba(20,15,8,.7); font-size:1.3rem; cursor:pointer; color:var(--gold);
+}
+#whiteboard-toggle{
+  position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 1rem); left:1rem; z-index:6;
+  width:42px; height:42px; border-radius:50%; border:1px solid var(--gold-dim);
+  background:rgba(20,15,8,.7); font-size:1.2rem; cursor:pointer; color:var(--gold);
+}
+#whiteboard-overlay{
+  position:fixed; inset:0; z-index:35; background:#f3eee0; opacity:0; pointer-events:none;
+  transition:opacity .35s ease;
+}
+#whiteboard-overlay.show{ opacity:1; pointer-events:auto; }
+#whiteboard-canvas{ position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+.wb-controls{ position:absolute; top:calc(env(safe-area-inset-top,0px) + 1rem); left:1rem; right:1rem;
+  z-index:2; display:flex; justify-content:space-between; }
+.wb-controls button{
+  font-family:'Tajawal',sans-serif; font-size:.9rem; padding:.5rem 1rem; border-radius:4px;
+  border:1px solid #9c8c5e; background:#fffef8; color:#1c1712; cursor:pointer;
+}
+#map-overlay{
+  position:fixed; inset:0; z-index:30; background:#0a1410; opacity:0; pointer-events:none;
+  transition:opacity .4s ease;
+}
+#map-overlay.show{ opacity:1; pointer-events:auto; }
+#map-leaflet{ position:absolute; inset:0; }
+#map-leaflet .leaflet-popup-content-wrapper{ font-family:'Tajawal',sans-serif; text-align:right; direction:rtl; }
+.map-controls{ position:absolute; top:calc(env(safe-area-inset-top,0px) + 1rem); left:1rem; z-index:400; display:flex; flex-direction:column; gap:.5rem; }
+.map-controls button{
+  width:36px; height:36px; border-radius:4px; border:1px solid var(--gold-dim); background:rgba(20,15,8,.85);
+  color:var(--gold); font-size:1.2rem; cursor:pointer;
+}
+#map-close{ position:absolute; top:calc(env(safe-area-inset-top,0px) + 1rem); right:1rem; z-index:400;
+  width:36px; height:36px; border-radius:4px; border:1px solid var(--gold-dim); background:rgba(20,15,8,.85);
+  color:var(--gold); font-size:1.1rem; cursor:pointer; }
+.map-title{ position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 1rem); left:50%; transform:translateX(-50%);
+  z-index:400; color:#c9bd9d; font-size:.8rem; background:rgba(10,8,5,.6); padding:.3rem .8rem; border-radius:4px; }
+
+/* place name links inside chapter text */
+.place-link{ color:#4fd8d1; font-weight:700; cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; }
+.place-link:hover{ color:#8ff0ea; }
+
+/* ---------- CHAPTER ICON ---------- */
+.chapter-icon{ margin-bottom:.8rem; }
+.chapter-icon svg{ width:56px; height:56px; }
+
+/* ---------- FINALE ---------- */
+#finale{
+  position:fixed; inset:0; z-index:20; opacity:0; pointer-events:none; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 35%, #1c4468 0%, #081722 78%);
+  transition:opacity 1.1s ease;
+}
+#finale.show{ opacity:1; pointer-events:auto; }
+.wind-line{
+  position:absolute; height:2px; right:-25%; width:36%; top:0;
+  background:linear-gradient(90deg, transparent, #e6f4ff, transparent); opacity:0;
+}
+.wind-line.go{ animation:windBlow 1.9s ease-in forwards; }
+@keyframes windBlow{
+  0%{ transform:translateX(0) translateY(0); opacity:0; }
+  12%{ opacity:.85; }
+  100%{ transform:translateX(-170vw) translateY(var(--drift,0)); opacity:0; }
+}
+.finale-box{
+  background:rgba(255,255,255,.08); border:1px solid rgba(223,240,255,.4); border-radius:6px;
+  padding:2rem 2.4rem; max-width:82%; text-align:center;
+  opacity:0; transform:scale(.8); transition:opacity .9s ease .7s, transform .9s ease .7s;
+}
+#finale.show .finale-box{ opacity:1; transform:scale(1); }
+.finale-box p{ font-family:'Amiri',serif; font-size:1.6rem; color:#eaf6ff; line-height:2.3; }
+.finale-close{ position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 1.6rem); left:50%;
+  transform:translateX(-50%); font-size:.8rem; color:#9fc4de; }
+@media(prefers-reduced-motion:reduce){ *{ animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+</style>
+</head>
+<body>
+
+<div class="stage" id="start">
+  <div id="icon-wrap"><svg id="icon" viewBox="0 0 32 32">
+    <rect class="node-rect g1" x="20" y="4" width="8" height="8" rx=".5" fill="#09ff00" stroke="#09ff00"/>
+    <rect class="node-rect w1" x="16" y="12" width="8" height="4" fill="#ffffff" stroke="#ffffff"/>
+    <rect class="node-rect w2" x="12" y="16" width="8" height="4" fill="#ffffff" stroke="#ffffff"/>
+    <rect class="node-rect g2" x="4" y="16" width="8" height="8" rx=".5" fill="#09ff00" stroke="#09ff00"/>
+  </svg></div>
+  <button id="start-btn">ابدأ</button>
+  <div id="loadbar-track"><div id="loadbar-fill"></div></div>
+</div>
+
+<div id="black-screen">
+  <div id="red-title">الحملات الصليبية</div>
+</div>
+
+<div id="deck">
+  <div class="arrow-btn" id="prev-btn" aria-label="الفصل السابق">›</div>
+  <div class="arrow-btn" id="next-btn" aria-label="الفصل التالي">‹</div>
+  <div id="pages"></div>
+  <div class="dots" id="dots"></div>
+  <div class="hint" id="hint">اسحب للتنقّل بين الفصول</div>
+  <button id="map-toggle" aria-label="فتح خريطة الحروب الصليبية" title="الخريطة">🗺</button>
+  <button id="whiteboard-toggle" aria-label="فتح السبورة البيضاء" title="السبورة">🖊</button>
+</div>
+
+<div id="finale">
+  <div class="finale-box"><p>وهذا وصلى الله وسلم وبارك على نبينا محمد وعلى آله وصحبه أجمعين.</p></div>
+  <div class="finale-close">اضغط في أي مكان للعودة</div>
+</div>
+
+<div id="map-overlay">
+  <div class="map-controls">
+    <button id="map-zoom-in" aria-label="تكبير الخريطة">+</button>
+    <button id="map-zoom-out" aria-label="تصغير الخريطة">−</button>
+  </div>
+  <button id="map-close" aria-label="إغلاق الخريطة">✕</button>
+  <div id="map-leaflet"></div>
+  <div class="map-title">خريطة تفاعلية (Leaflet / OpenStreetMap) — القدس هي المرجع المركزي</div>
+</div>
+
+<div id="whiteboard-overlay">
+  <div class="wb-controls">
+    <button id="wb-clear">مسح</button>
+    <button id="wb-close">إغلاق ✕</button>
+  </div>
+  <canvas id="whiteboard-canvas"></canvas>
+</div>
+
+<script>
+const ICONS = {
+  spark:`<svg viewBox="0 0 64 64" fill="none" stroke="#c9a227" stroke-width="2"><circle cx="24" cy="32" r="15"/><circle cx="40" cy="32" r="15"/></svg>`,
+  fortress:`<svg viewBox="0 0 64 64" fill="none" stroke="#c9a227" stroke-width="2"><rect x="16" y="26" width="32" height="28"/><path d="M16 26v-8h6v4h6v-4h8v4h6v-4h6v8"/></svg>`,
+  crescent:`<svg viewBox="0 0 64 64"><path d="M40 12a20 20 0 1 0 0 40 16 16 0 1 1 0-40Z" fill="#c9a227"/></svg>`,
+  ship:`<svg viewBox="0 0 64 64" fill="none" stroke="#c9a227" stroke-width="2"><path d="M10 40h44l-8 12H18Z"/><line x1="32" y1="40" x2="32" y2="12"/><path d="M32 14l16 10-16 6Z" fill="#c9a227" stroke="none"/></svg>`,
+  scroll:`<svg viewBox="0 0 64 64" fill="none" stroke="#c9a227" stroke-width="2"><rect x="14" y="18" width="36" height="28" rx="2"/><circle cx="14" cy="18" r="4"/><circle cx="14" cy="46" r="4"/><circle cx="50" cy="18" r="4"/><circle cx="50" cy="46" r="4"/></svg>`,
+  scales:`<svg viewBox="0 0 64 64" fill="none" stroke="#c9a227" stroke-width="2"><line x1="32" y1="8" x2="32" y2="50"/><line x1="14" y1="20" x2="50" y2="20"/><path d="M14 20 8 34a6 6 0 0 0 12 0Z"/><path d="M50 20 44 34a6 6 0 0 0 12 0Z"/><line x1="22" y1="54" x2="42" y2="54"/></svg>`
+};
+const chapters = [
+  { eyebrow:"مقدّمة", title:"عالمان على حافة الصدام", icon:"spark",
+    body:"في نهاية القرن الحادي عشر الميلادي، انطلقت سلسلة من الحملات العسكرية من أوروبا الغربية باتجاه بلاد الشام، عُرفت لاحقًا باسم الحروب الصليبية. استمرت هذه الحملات قرابة قرنين من الزمن، وشكّلت نقطة تحوّل في العلاقة بين العالمين الإسلامي والمسيحي. تشابكت في الدعوة إليها دوافع دينية وسياسية واقتصادية، من استرداد الأراضي المقدسة إلى توسيع النفوذ وتأمين طرق التجارة." },
+  { eyebrow:"١٠٩٦ – ١٠٩٩", title:"الحملة الأولى وسقوط القدس", icon:"fortress",
+    body:"دعا البابا أوربان الثاني إلى حملة لاسترداد الأراضي المقدسة، فاستجابت جيوش من الفرنجة والنورمان. بعد حصار طويل ومعارك دامية، سقطت مدينة <span class=\"place-link\" data-place=\"jerusalem\">القدس</span> عام ١٠٩٩م، وقامت على الساحل الشامي عدة إمارات صليبية. ترافق سقوط المدينة مع مجازر واسعة بحق سكانها من المسلمين واليهود، تركت أثرًا عميقًا في الذاكرة التاريخية للمنطقة." },
+  { eyebrow:"١١٨٧م", title:"صلاح الدين واسترداد القدس", icon:"crescent",
+    body:"هزم صلاح الدين الأيوبي القوات الصليبية في معركة <span class=\"place-link\" data-place=\"hattin\">حطين</span> الحاسمة، واستعاد <span class=\"place-link\" data-place=\"jerusalem\">القدس</span> بعد نحو تسعين عامًا من الحكم الصليبي، في فتح وُصف بالتسامح النسبي مع سكان المدينة. وقد سبق ذلك توحيده لمصر والشام تحت راية واحدة، وهو ما مهّد الطريق لحسم المواجهة مع الصليبيين." },
+  { eyebrow:"١١٨٩ – ١٢٩١م", title:"حملات لاحقة ونهاية الصراع", icon:"ship",
+    body:"تلت ذلك حملات أخرى، منها الحملة الثالثة التي قادها ريتشارد قلب الأسد، حتى سقط آخر معقل صليبي في <span class=\"place-link\" data-place=\"acre\">عكا</span> عام ١٢٩١م على يد المماليك، لتُطوى صفحة قرنين من الصراع. وشهدت هذه الحقبة أيضًا حملات منحرفة، أبرزها الحملة الرابعة التي انتهت بنهب <span class=\"place-link\" data-place=\"constantinople\">القسطنطينية</span> المسيحية نفسها عام ١٢٠٤م." },
+  { eyebrow:"الإرث", title:"أثر باقٍ على الطرفين", icon:"scroll",
+    body:"تركت الحروب الصليبية أثرًا عميقًا في الذاكرة التاريخية لكلا الطرفين، وأسهمت رغم دمارها في تبادل ثقافي وتجاري بين الشرق والغرب، ولا تزال محل دراسة وتفسيرات متعددة حتى اليوم. كما أسهمت في تطور فرق عسكرية دينية كفرسان الهيكل والإسبتارية، وفي تشكّل صورة متبادلة بين الشرق والغرب استمرت قرونًا." },
+  { eyebrow:"خلاصة", title:"الحروب الصليبية بالأرقام", type:"stats",
+    stats:[
+      {num:"١٩٥", label:"عامًا من الصراع (١٠٩٦–١٢٩١)"},
+      {num:"٩", label:"حملات رئيسية"},
+      {num:"١٠٩٩", label:"سقوط القدس بيد الصليبيين"},
+      {num:"١١٨٧", label:"استعادة صلاح الدين للقدس"},
+      {num:"١٢٩١", label:"سقوط عكا، آخر المعاقل"},
+      {num:"٢", label:"قرنان من التبادل بين الشرق والغرب"}
+    ]},
+  { eyebrow:"اختبر نفسك", title:"اختبار سريع", type:"quiz",
+    quiz:[
+      { q:"من قاد استعادة القدس عام ١١٨٧م؟",
+        opts:["صلاح الدين الأيوبي","ريتشارد قلب الأسد","أوربان الثاني","هارون الرشيد"], correct:0 },
+      { q:"في أي عام سقطت القدس بيد الصليبيين لأول مرة؟",
+        opts:["١٠٩٦","١١٨٧","١٠٩٩","١٢٩١"], correct:2 },
+      { q:"من أطلق الدعوة إلى الحملة الصليبية الأولى؟",
+        opts:["صلاح الدين الأيوبي","البابا أوربان الثاني","المماليك","ريتشارد قلب الأسد"], correct:1 },
+      { q:"أي قوة أنهت الوجود الصليبي في الشام بسقوط عكا؟",
+        opts:["الفاطميون","السلاجقة","المماليك","العباسيون"], correct:2 }
+    ]},
+  { eyebrow:"الخلاصة النهائية", title:"من كسب أكثر؟", icon:"scales",
+    body:"عسكريًا وجغرافيًا، كان المسلمون الطرف الأرسخ في النهاية؛ إذ استعادوا بلاد الشام كاملة وأنهوا الوجود الصليبي فيها بحلول عام ١٢٩١م. أما اقتصاديًا ومعرفيًا، فقد استفادت أوروبا المسيحية استفادة كبيرة، إذ انفتحت طرق تجارية جديدة أثرت جمهوريات إيطالية كـ<span class=\"place-link\" data-place=\"venice\">البندقية</span> وجنوة، ونُقلت علوم ومنتجات شرقية أسهمت لاحقًا في نهضتها. فلا يوجد \"فائز\" واحد بإطلاق: الانتصار السياسي والعسكري كان حليف المسلمين، بينما جنت أوروبا مكاسب اقتصادية طويلة الأمد، في حين تحمّل سكان الشام أنفسهم - مسلمين ومسيحيين شرقيين - الجزء الأكبر من الدمار والخسائر." }
+];
+
+const pagesEl = document.getElementById('pages');
+const dotsEl = document.getElementById('dots');
+chapters.forEach((c,i)=>{
+  const p = document.createElement('div');
+  p.className = 'page' + (i===0 ? ' active' : ' next');
+  if(c.type === 'stats'){
+    const grid = c.stats.map(s=>`<div class="stat-block"><div class="stat-num">${s.num}</div><div class="stat-label">${s.label}</div></div>`).join('');
+    p.innerHTML = `<div class="page-box"><div class="eyebrow">${c.eyebrow}</div><h2>${c.title}</h2><div class="stats-grid">${grid}</div></div>`;
+  } else if(c.type === 'quiz'){
+    const qs = c.quiz.map((q,qi)=>{
+      const opts = q.opts.map((o,oi)=>`<button class="quiz-opt" data-q="${qi}" data-o="${oi}">${o}</button>`).join('');
+      return `<div class="quiz-q"><p>${qi+1}. ${q.q}</p><div class="quiz-opts">${opts}</div></div>`;
+    }).join('');
+    p.innerHTML = `<div class="page-box"><div class="eyebrow">${c.eyebrow}</div><h2>${c.title}</h2><div class="quiz-wrap">${qs}<div id="quiz-score">النتيجة: ٠ / ${c.quiz.length}</div></div></div>`;
+  } else {
+    p.innerHTML = `<div class="page-box"><div class="chapter-icon">${ICONS[c.icon]||''}</div><div class="eyebrow">${c.eyebrow}</div><h2>${c.title}</h2><p>${c.body}</p></div>`;
+  }
+  pagesEl.appendChild(p);
+  const d = document.createElement('div');
+  d.className = 'dot' + (i===0 ? ' active' : '');
+  d.title = c.eyebrow || c.title;
+  dotsEl.appendChild(d);
+});
+
+/* quiz scoring */
+const quizChapterIdx = chapters.findIndex(c=>c.type==='quiz');
+if(quizChapterIdx > -1){
+  let score = 0;
+  const quizData = chapters[quizChapterIdx].quiz;
+  const scoreEl = pagesEl.children[quizChapterIdx].querySelector('#quiz-score');
+  pagesEl.children[quizChapterIdx].querySelectorAll('.quiz-opt').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const qi = +btn.dataset.q, oi = +btn.dataset.o;
+      const group = pagesEl.children[quizChapterIdx].querySelectorAll(`.quiz-opt[data-q="${qi}"]`);
+      if(group[0].disabled) return;
+      group.forEach(b=>{
+        b.disabled = true;
+        if(+b.dataset.o === quizData[qi].correct) b.classList.add('correct');
+        else if(b === btn) b.classList.add('wrong');
+      });
+      if(oi === quizData[qi].correct) score++;
+      scoreEl.textContent = `النتيجة: ${score} / ${quizData.length}`;
+    });
+  });
+}
+const pageEls = [...pagesEl.children];
+const dotEls = [...dotsEl.children];
+const hintEl = document.getElementById('hint');
+const lastIdx = chapters.length - 1;
+let idx = 0;
+function render(dir){
+  pageEls.forEach((p,i)=>{
+    p.classList.remove('active','next','prev');
+    if(i===idx) p.classList.add('active');
+    else if(i<idx) p.classList.add('prev');
+    else p.classList.add('next');
+  });
+  dotEls.forEach((d,i)=> d.classList.toggle('active', i===idx));
+  hintEl.textContent = idx===lastIdx ? 'اسحب للأعلى للختام' : 'اسحب للتنقّل بين الفصول';
+}
+function go(delta){
+  const n = idx + delta;
+  if(n<0 || n>=chapters.length) return;
+  idx = n; render();
+  playPageTurn();
+}
+document.getElementById('next-btn').onclick = ()=>go(1);
+document.getElementById('prev-btn').onclick = ()=>go(-1);
+
+/* ---- map: real Leaflet / OpenStreetMap map, bounded to the historical theatre ---- */
+const mapOverlay = document.getElementById('map-overlay');
+const PLACES = {
+  jerusalem:      { latlng:[31.7683, 35.2137], label:"القدس" },
+  hattin:         { latlng:[32.8130, 35.4479], label:"حطين (معركة ١١٨٧م)" },
+  acre:           { latlng:[32.9281, 35.0818], label:"عكا" },
+  constantinople: { latlng:[41.0082, 28.9784], label:"القسطنطينية" },
+  venice:         { latlng:[45.4408, 12.3155], label:"البندقية" }
+};
+let map = null, mapMarkers = {};
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl:'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png'
+});
+function initMap(){
+  if(map) return;
+  map = L.map('map-leaflet', {
+    zoomControl:false,
+    maxBounds:[[24,6],[49,43]],
+    maxBoundsViscosity:1.0,
+    minZoom:4, maxZoom:10
+  }).setView(PLACES.jerusalem.latlng, 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'&copy; OpenStreetMap contributors', maxZoom:10
+  }).addTo(map);
+  Object.entries(PLACES).forEach(([key,p])=>{
+    mapMarkers[key] = L.marker(p.latlng).addTo(map).bindPopup(p.label);
+  });
+}
+function centerMapOn(place){
+  const p = PLACES[place];
+  if(!p) return;
+  map.flyTo(p.latlng, 7, {duration:0.8});
+  mapMarkers[place].openPopup();
+}
+function openMap(place){
+  mapOverlay.classList.add('show');
+  initMap();
+  setTimeout(()=>{ map.invalidateSize(); if(place) centerMapOn(place); }, 50);
+}
+function closeMap(){ mapOverlay.classList.remove('show'); }
+document.getElementById('map-toggle').onclick = ()=>openMap();
+document.getElementById('map-close').onclick = closeMap;
+document.getElementById('map-zoom-in').onclick = ()=> map && map.zoomIn();
+document.getElementById('map-zoom-out').onclick = ()=> map && map.zoomOut();
+window.addEventListener('keydown', e=>{ if(e.key==='Escape' && mapOverlay.classList.contains('show')) closeMap(); });
+
+pagesEl.addEventListener('click', e=>{
+  const link = e.target.closest('.place-link');
+  if(link) openMap(link.dataset.place);
+});
+
+/* ---- whiteboard ---- */
+const wbOverlay = document.getElementById('whiteboard-overlay');
+const wbCanvas = document.getElementById('whiteboard-canvas');
+let wbCtx = null, wbDrawing = false, wbLast = null;
+function wbResize(){
+  wbCanvas.width = window.innerWidth; wbCanvas.height = window.innerHeight;
+  wbCtx = wbCanvas.getContext('2d');
+  wbCtx.lineWidth = 3; wbCtx.lineCap = 'round'; wbCtx.lineJoin = 'round'; wbCtx.strokeStyle = '#1c1712';
+}
+function wbStart(x,y){ wbDrawing = true; wbLast = {x,y}; }
+function wbDraw(x,y){
+  if(!wbDrawing || !wbCtx) return;
+  wbCtx.beginPath(); wbCtx.moveTo(wbLast.x, wbLast.y); wbCtx.lineTo(x,y); wbCtx.stroke();
+  wbLast = {x,y};
+}
+function wbEnd(){ wbDrawing = false; }
+document.getElementById('whiteboard-toggle').onclick = ()=>{ wbOverlay.classList.add('show'); wbResize(); };
+document.getElementById('wb-close').onclick = ()=> wbOverlay.classList.remove('show');
+document.getElementById('wb-clear').onclick = ()=>{ if(wbCtx) wbCtx.clearRect(0,0,wbCanvas.width,wbCanvas.height); };
+wbCanvas.addEventListener('mousedown', e=> wbStart(e.clientX, e.clientY));
+window.addEventListener('mousemove', e=> wbDraw(e.clientX, e.clientY));
+window.addEventListener('mouseup', wbEnd);
+wbCanvas.addEventListener('touchstart', e=>{ const t=e.touches[0]; wbStart(t.clientX, t.clientY); }, {passive:true});
+wbCanvas.addEventListener('touchmove', e=>{ const t=e.touches[0]; wbDraw(t.clientX, t.clientY); e.preventDefault(); }, {passive:false});
+wbCanvas.addEventListener('touchend', wbEnd, {passive:true});
+window.addEventListener('resize', ()=>{ if(wbOverlay.classList.contains('show')) wbResize(); });
+
+let touchX = null, touchY = null;
+const deck = document.getElementById('deck');
+deck.addEventListener('touchstart', e=>{ touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }, {passive:true});
+deck.addEventListener('touchend', e=>{
+  if(touchX===null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  const dy = e.changedTouches[0].clientY - touchY;
+  if(Math.abs(dy) > Math.abs(dx) && dy < -50){
+    if(idx===lastIdx) triggerFinale();
+  } else if(Math.abs(dx) > 40){
+    go(dx < 0 ? -1 : 1);
+  }
+  touchX = null; touchY = null;
+}, {passive:true});
+let wheelLock = false;
+deck.addEventListener('wheel', e=>{
+  if(idx===lastIdx && e.deltaY < -25 && !wheelLock){
+    wheelLock = true; triggerFinale();
+    setTimeout(()=> wheelLock=false, 1500);
+  }
+}, {passive:true});
+window.addEventListener('keydown', e=>{
+  if(!deck.classList.contains('show')) return;
+  if(e.key==='ArrowLeft') go(1);
+  if(e.key==='ArrowRight') go(-1);
+  if(e.key==='ArrowUp' && idx===lastIdx) triggerFinale();
+});
+document.getElementById('finale').addEventListener('click', ()=>{
+  document.getElementById('finale').classList.remove('show');
+});
+
+/* ---- shared audio context ---- */
+let audioCtx = null;
+function getCtx(){
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+/* ---- jingle via WebAudio ---- */
+function playJingle(){
+  try{
+    const ctx = getCtx();
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((f, i)=>{
+      const t = ctx.currentTime + i*0.26;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, t);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t+0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t+0.5);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(t); osc.stop(t+0.55);
+    });
+  }catch(e){}
+}
+
+/* ---- page-turn flutter ---- */
+function playPageTurn(){
+  try{
+    const ctx = getCtx();
+    const dur = 0.4;
+    const buf = ctx.createBuffer(1, ctx.sampleRate*dur, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<data.length;i++){
+      const t = i/data.length;
+      data[i] = (Math.random()*2-1) * Math.pow(1-t, 1.6);
+    }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 900;
+    const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 4200;
+    const trem = ctx.createGain(); trem.gain.value = 0.6;
+    const lfo = ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value = 34;
+    const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.35;
+    lfo.connect(lfoGain); lfoGain.connect(trem.gain);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime+0.03);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+    src.connect(hp); hp.connect(lp); lp.connect(trem); trem.connect(gain); gain.connect(ctx.destination);
+    lfo.start(); lfo.stop(ctx.currentTime+dur);
+    src.start(); src.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+
+/* ---- wind gust ---- */
+function playWind(){
+  try{
+    const ctx = getCtx();
+    const dur = 2.2;
+    const buf = ctx.createBuffer(1, ctx.sampleRate*dur, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i] = Math.random()*2-1;
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = false;
+    const filt = ctx.createBiquadFilter(); filt.type='bandpass'; filt.Q.value=0.5;
+    filt.frequency.setValueAtTime(300, ctx.currentTime);
+    filt.frequency.linearRampToValueAtTime(1200, ctx.currentTime+dur*0.5);
+    filt.frequency.linearRampToValueAtTime(250, ctx.currentTime+dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.22, ctx.currentTime+0.4);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime+dur);
+    src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+    src.start();
+  }catch(e){}
+}
+
+/* ---- finale: swipe up on last slide ---- */
+function triggerFinale(){
+  const finale = document.getElementById('finale');
+  finale.querySelectorAll('.wind-line').forEach(l=>l.remove());
+  for(let i=0;i<16;i++){
+    const l = document.createElement('div');
+    l.className = 'wind-line go';
+    l.style.top = (Math.random()*100)+'%';
+    l.style.setProperty('--drift', (Math.random()*40-20)+'px');
+    l.style.animationDelay = (Math.random()*0.8)+'s';
+    l.style.width = (20+Math.random()*25)+'%';
+    finale.insertBefore(l, finale.firstChild);
+  }
+  finale.classList.add('show');
+  playWind();
+}
+
+/* ---- sequence with new black screen transition ---- */
+document.getElementById('start-btn').addEventListener('click', ()=>{
+  const btn = document.getElementById('start-btn');
+  const iconWrap = document.getElementById('icon-wrap');
+  const track = document.getElementById('loadbar-track');
+  const fill = document.getElementById('loadbar-fill');
+  btn.disabled = true; btn.style.visibility = 'hidden';
+  iconWrap.classList.add('animating');
+  track.classList.add('show');
+  playJingle();
+  requestAnimationFrame(()=> fill.style.width = '100%');
+
+  setTimeout(()=>{
+    document.getElementById('start').style.opacity = '0';
+    const blackScreen = document.getElementById('black-screen');
+    
+    // Fade to black screen
+    blackScreen.classList.add('show');
+    setTimeout(()=> document.getElementById('start').style.display='none', 650);
+
+    setTimeout(()=>{
+      const redTitle = document.getElementById('red-title');
+      
+      // Show red classical arabic text
+      redTitle.classList.add('show');
+      
+      setTimeout(()=>{
+        // Words disappear first
+        redTitle.classList.remove('show');
+        
+        setTimeout(()=>{
+          // Black screen fades out to reveal the deck
+          blackScreen.classList.remove('show');
+          setTimeout(()=>{
+            blackScreen.style.display = 'none';
+            document.getElementById('deck').classList.add('show');
+          }, 700);
+        }, 700);
+      }, 1500); // Waits for a second and a half on screen
+    }, 800);
+  }, 2200);
+});
+</script>
+</body>
+</html>
